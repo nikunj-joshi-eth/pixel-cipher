@@ -1,122 +1,81 @@
-<div align="center">
+<h1 align="center">Pixel Cipher</h1>
 
-# 🖼️ Pixel Cipher
+<p align="center">
+  <em>Image encryption using XOR keystream and pixel shuffling — with a friendly CLI, real tests, and CI.</em>
+</p>
 
-**Password-based image encryption via reversible pixel manipulation.**
+<p align="center">
+  <img src="https://img.shields.io/badge/python-3.9%2B-blue" alt="Python"/>
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License"/>
+  <img src="https://github.com/nikunj-joshi-eth/pixel-cipher/actions/workflows/tests.yml/badge.svg" alt="Tests"/>
+</p>
 
-Encrypt any image so its pixels are visually scrambled, then decrypt it back to a byte-perfect original — all with a single password.
+## See it in action
 
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
-![Tests](https://github.com/nikunj-joshi-eth/pixel-cipher/actions/workflows/tests.yml/badge.svg)
-![License](https://img.shields.io/github/license/nikunj-joshi-eth/pixel-cipher)
-![Release](https://img.shields.io/github/v/release/nikunj-joshi-eth/pixel-cipher)
-![Stars](https://img.shields.io/github/stars/nikunj-joshi-eth/pixel-cipher?style=social)
+| Original | Encrypted |
+|----------|-----------|
+| ![original](assets/sample_original.png) | ![encrypted](assets/sample_encrypted.png) |
 
-</div>
+## Features
 
----
+- **XOR keystream** — deterministic SHA-256-based keystream XORed with every pixel byte.
+- **Pixel shuffle** — deterministic permutation of pixel positions using a seed.
+- Reversible: decrypt with the same key/seed to recover the original exactly.
+- Simple CLI, unit-tested with `pytest`, CI on Python 3.9 – 3.12.
 
-## ✨ Features
-
-- 🔐 **XOR keystream** — every byte XOR-ed with a SHA-256-derived keystream
-- 🔀 **Pixel shuffle** — deterministic permutation seeded from the password
-- 🎛️ Use either operation alone, or both stacked (`--mode both`, default)
-- ↩️ Perfectly reversible: same password → byte-identical original
-- 🚫 Wrong password → visually unrecognisable output (no accidental recovery)
-- 🖥️ Clean CLI with hidden password prompt
-- 🧪 Full `pytest` suite; CI on Python 3.9 – 3.12
-- 📦 Only depends on `numpy` and `Pillow`
-
----
-
-## 🚀 Quick start
+## Installation
 
 ```bash
 git clone https://github.com/nikunj-joshi-eth/pixel-cipher.git
 cd pixel-cipher
-pip install -r requirements.txt
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
 ```
 
-### CLI
+## Usage
 
 ```bash
-# Encrypt (password prompt is hidden)
-python main.py encrypt -i cat.png -o cat.enc.png
+# XOR encrypt / decrypt
+pixel-cipher encrypt --algo xor --key "hunter2" -i photo.png -o enc.png
+pixel-cipher decrypt --algo xor --key "hunter2" -i enc.png   -o out.png
 
-# Decrypt back to the original
-python main.py decrypt -i cat.enc.png -o cat.out.png
-
-# Pick an operation
-python main.py encrypt -i cat.png -o cat.enc.png -m shuffle
-python main.py encrypt -i cat.png -o cat.enc.png -m xor
+# Pixel shuffle
+pixel-cipher encrypt --algo shuffle --seed 42 -i photo.png -o enc.png
+pixel-cipher decrypt --algo shuffle --seed 42 -i enc.png   -o out.png
 ```
 
-### Library
-
-```python
-from pixel_cipher import encrypt_image, decrypt_image, EncryptionMode
-
-encrypt_image("cat.png", "cat.enc.png", password="hunter2")
-decrypt_image("cat.enc.png", "cat.out.png", password="hunter2")
-
-# Only shuffle pixel positions (keeps the color histogram intact)
-encrypt_image("cat.png", "cat.shuf.png", password="hunter2",
-              mode=EncryptionMode.SHUFFLE)
-```
-
----
-
-## 🧠 How it works
-
-Every image is a 3-D array of `uint8` pixel values `(H × W × 3)`. Pixel Cipher applies one or two reversible operations, both keyed by the password:
-
-| Operation | What it does | Why it's reversible |
-|-----------|--------------|---------------------|
-| **XOR**     | Each byte is XOR-ed with a pseudo-random keystream derived from `SHA-256(password)` | XOR is self-inverse: `x ⊕ k ⊕ k = x` |
-| **SHUFFLE** | Pixel positions are permuted with a `numpy` PRNG seeded by the password | Store the permutation → apply its inverse on decrypt |
-
-Both operations are 100% deterministic, so the same password always produces the same output.
-
-> ⚠️ **Security note.** This is a *learning* / *portfolio* project demonstrating pixel manipulation, not a production-grade cipher. It is not IND-CPA secure and should not be used to protect sensitive data — reach for AES-GCM (via `cryptography`) for real workloads.
-
----
-
-## 🧪 Running tests
+## Testing
 
 ```bash
-pip install -r requirements-dev.txt
 pytest -v
 ```
 
-The suite covers: round-trip recovery for every mode, wrong-password behavior, deterministic output, and input validation.
+## Project structure
 
----
-
-## 📂 Project structure
-
-```text
+```
 pixel-cipher/
 ├── src/pixel_cipher/
-│   ├── cipher.py         # encrypt / decrypt core
-│   └── cli.py            # argparse-based CLI
-├── tests/                # pytest suite
-├── examples/demo.py      # generate + encrypt + decrypt a sample image
-├── .github/workflows/    # CI (multi-version pytest)
-├── main.py               # CLI launcher
+│   ├── __init__.py
+│   ├── cipher.py        # XOR + shuffle primitives
+│   └── cli.py           # CLI entry point
+├── tests/test_cipher.py
+├── examples/demo.py     # generates the before/after images in assets/
+├── assets/              # sample images used in README
+├── .github/workflows/tests.yml
+├── pyproject.toml
+├── requirements.txt
+├── LICENSE
 └── README.md
 ```
 
----
+## Security note
 
-## 🗺️ Roadmap
+This is an educational project. XOR-with-a-keystream is only as strong as the
+keystream's unpredictability, and pixel shuffling preserves the colour
+histogram of the original image (so it leaks statistical structure). Do not
+use this for real secrets — use vetted libraries like `cryptography` or
+`libsodium` instead.
 
-- [ ] AES-GCM mode for real confidentiality
-- [ ] Batch encrypt an entire folder
-- [ ] Streamlit demo with before/after preview
-- [ ] Support for PNG alpha channels and grayscale images
+## License
 
----
-
-## 📜 License
-
-MIT © [Nikunj Joshi](https://github.com/nikunj-joshi-eth)
+MIT © Nikunj Joshi

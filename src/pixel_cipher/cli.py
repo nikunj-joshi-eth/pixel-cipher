@@ -2,52 +2,40 @@
 from __future__ import annotations
 
 import argparse
-import getpass
 import sys
+from PIL import Image
 
-from .cipher import EncryptionMode, decrypt_image, encrypt_image
-
-
-def _parse_mode(name: str) -> EncryptionMode:
-    return {
-        "xor": EncryptionMode.XOR,
-        "shuffle": EncryptionMode.SHUFFLE,
-        "both": EncryptionMode.BOTH,
-    }[name]
-
-
-def _get_password(args: argparse.Namespace) -> str:
-    if args.password:
-        return args.password
-    return getpass.getpass("Password: ")
-
-
-def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="pixel-cipher",
-        description="Encrypt or decrypt images via reversible pixel manipulation.",
-    )
-    sub = p.add_subparsers(dest="command", required=True)
-
-    for name, help_text in (("encrypt", "Encrypt an image"), ("decrypt", "Decrypt an image")):
-        sp = sub.add_parser(name, help=help_text)
-        sp.add_argument("-i", "--input", required=True, help="Input image path")
-        sp.add_argument("-o", "--output", required=True, help="Output image path")
-        sp.add_argument("-p", "--password", help="Password (prompted if omitted)")
-        sp.add_argument(
-            "-m", "--mode", default="both", choices=["xor", "shuffle", "both"],
-            help="Which operation(s) to apply (default: both)",
-        )
-    return p
+from .cipher import xor_encrypt, xor_decrypt, shuffle_encrypt, shuffle_decrypt
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
-    password = _get_password(args)
-    mode = _parse_mode(args.mode)
-    action = encrypt_image if args.command == "encrypt" else decrypt_image
-    action(args.input, args.output, password, mode=mode)
-    print(f"[pixel-cipher] {args.command}ed → {args.output}")
+    p = argparse.ArgumentParser(
+        prog="pixel-cipher",
+        description="Encrypt or decrypt an image using XOR keystream or pixel shuffling.",
+    )
+    p.add_argument("mode", choices=["encrypt", "decrypt"])
+    p.add_argument("--algo", choices=["xor", "shuffle"], default="xor")
+    p.add_argument("--input", "-i", required=True, help="input image path")
+    p.add_argument("--output", "-o", required=True, help="output image path")
+    p.add_argument("--key", help="secret string (required for --algo xor)")
+    p.add_argument("--seed", type=int, help="integer seed (required for --algo shuffle)")
+    args = p.parse_args(argv)
+
+    img = Image.open(args.input)
+
+    if args.algo == "xor":
+        if not args.key:
+            p.error("--key is required for --algo xor")
+        fn = xor_encrypt if args.mode == "encrypt" else xor_decrypt
+        out = fn(img, key=args.key)
+    else:
+        if args.seed is None:
+            p.error("--seed is required for --algo shuffle")
+        fn = shuffle_encrypt if args.mode == "encrypt" else shuffle_decrypt
+        out = fn(img, seed=args.seed)
+
+    out.save(args.output)
+    print(f"wrote {args.output}")
     return 0
 
 

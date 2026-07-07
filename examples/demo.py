@@ -1,19 +1,23 @@
-"""Quick demo: encrypt then decrypt an image."""
+"""Generate before/after sample images in assets/."""
 from pathlib import Path
+import numpy as np
+from PIL import Image
+from pixel_cipher.cipher import xor_encrypt
 
-from src.pixel_cipher import decrypt_image, encrypt_image
+ROOT = Path(__file__).resolve().parent.parent
+ASSETS = ROOT / "assets"
+ASSETS.mkdir(exist_ok=True)
 
-HERE = Path(__file__).parent
-sample = HERE / "sample.png"
-encrypted = HERE / "sample.encrypted.png"
-recovered = HERE / "sample.recovered.png"
+rng = np.random.default_rng(0)
+h, w = 128, 128
+grad = np.zeros((h, w, 3), dtype=np.uint8)
+grad[..., 0] = np.linspace(0, 255, w, dtype=np.uint8)[None, :]
+grad[..., 1] = np.linspace(0, 255, h, dtype=np.uint8)[:, None]
+grad[..., 2] = 128
+img = Image.fromarray(grad, mode="RGB")
+img.save(ASSETS / "sample_original.png")
 
-if not sample.exists():
-    from PIL import Image
-    import numpy as np
-    Image.fromarray(np.random.default_rng(0).integers(0, 256, (128, 128, 3), dtype=np.uint8), "RGB").save(sample)
+enc = xor_encrypt(img, key="demo-key")
+enc.save(ASSETS / "sample_encrypted.png")
 
-encrypt_image(sample, encrypted, password="hunter2")
-decrypt_image(encrypted, recovered, password="hunter2")
-print("Encrypted →", encrypted)
-print("Recovered →", recovered)
+print("wrote assets/sample_original.png and assets/sample_encrypted.png")
